@@ -263,7 +263,7 @@ void assignCoordinates(Node* current, int level)
         current->y = inity + (current->positionInLevel - (levelNodeCount[level]+1)/2) * quanta;
     }
     else{
-        current->y = inity - 50 + (current->positionInLevel - (levelNodeCount[level]+1)/2) * quanta;
+        current->y = inity - 75 + (current->positionInLevel - (levelNodeCount[level]+1)/2) * quanta;
     }
 
     for(int i=0;i< current->children.size(); i++){
