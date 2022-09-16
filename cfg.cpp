@@ -13,6 +13,7 @@ vector<string> lines;
 int curIndex = 0;
 int quanta = 150, initx = 200, inity = 400;
 bool backedge[5000][5000];
+int cyclomaticComplexity = 0;
 
 class Node{
 public:
@@ -144,6 +145,7 @@ Node* buildCFG(Node *root, bool isLoop)
 
         //cout<< "curNodew: "<< curNode->lineNo << " " << "parent: " << parent->lineNo<< "\n";
         if(containsLoop(lines[curIndex]) || containsIf(lines[curIndex])){
+            cyclomaticComplexity++;
            // cout<< "loop or if -- ";
             if(branches.size()>0){
                 for(int i=0;i<branches.size(); i++){
@@ -179,6 +181,9 @@ Node* buildCFG(Node *root, bool isLoop)
         else if(containsElseIf(lines[curIndex]) || containsElse(lines[curIndex])){
             //cout<< "else if or else" << endl;
             //parent->addChild(curNode);
+            if(containsElseIf(lines[curIndex])){
+                cyclomaticComplexity++;
+            }
             parent->children.push_back(curNode);
             // for(int i=0;i<parent->children.size();i++){
             //     cout<< "else branch: "<< parent->children[i]->lineNo+1 << endl;
@@ -331,12 +336,16 @@ void init()
     //cout<<"siam: " << root->lineNo << " " <<  endl;
     curIndex++;
     buildCFG(root, false);
+    char s[60] = "Cyclomatic Complexity: ";
+    s[23] = '0' + cyclomaticComplexity ;
+    settextstyle(8, 0, 4);
+    outtextxy(700, 100, s);
     traverse(root, 0);
     resetVisited();
     assignCoordinates(root, 0);
     resetVisited();
     printGraph(root);
-
+    cout<< "cyclomatic: " << cyclomaticComplexity << endl;
 
     // line for x1, y1, x2, y2
    // line(150, 150, 450, 150);
