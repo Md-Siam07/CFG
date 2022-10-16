@@ -1,20 +1,15 @@
-#define
-//sine
-int main()
-    int a, b;
-
-    if(a==0){
-
+scanf("%d", &x);
+scanf("%d", &y);
+while(x<15)
+{
+    if(x!=5||x>5&&x<7)
+    {
+        x=x-y
     }
-    else if{
-
+    else
+    {
+        y=y-x
     }
-    else{
-
-    }
-    for(){
-
-    }
-    while(){
-        
-    }
+}
+printf("%d", x);
+printf("%d", y);
