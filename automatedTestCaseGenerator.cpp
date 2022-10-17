@@ -16,9 +16,10 @@ using namespace std;
 
 vector<string> lines;
 int curIndex = 0;
-int quanta = 150, initx = 200, inity = 400;
+int quanta = 100, initx = 50, inity = 400;
 bool backedge[5000][5000];
 int cyclomaticComplexity = 2;
+
 
 class Node{
 public:
@@ -27,6 +28,10 @@ public:
     vector<Node*> children;
     vector<string> conditions;
     vector<char> operators;
+    vector<string> hiddenConditions;
+    vector<char> hiddenOperators;
+    vector<string> opConditions;
+    vector<char> opOperators;
     bool hasBackedge;
     bool loopInitiated, isLoop;
     int loopStart, loopEnd, loopIncrement;
@@ -60,6 +65,7 @@ public:
 
 vector<varRanges> vars;
 vector<varRanges> hiddenElse;
+Node *root;
 
 int mystoi(string s){
     //cout<< "mystoil: "<< s.length()<< endl;
@@ -75,12 +81,31 @@ int mystoi(string s){
     return ret;
 }
 
+string getConditionInsideFor(string s)
+{
+    cout<< s<< endl;
+    int index = 0;
+    string tem = "";
+    while(s[index]!=';'){
+        index++;
+    }
+    index++;
+    while(s[index]!=';'){
+        tem += s[index];
+        index++;
+    }
+    return tem;
+}
+
 string extractVar(string s)
 {
     string tem = "";
     int index  = 0;
     while(index<s.size() && (s[index]!= '<' &&  s[index]!='>' && s[index]!='=' && s[index]!='!')){
-
+        if(s[index] == '|' || s[index] == '&'){
+            index++;
+            continue;
+        }
         tem += s[index];
         index++;
     }
@@ -328,6 +353,14 @@ Node* buildCFG(Node *root, bool isLoop)
                     curNode->operators = operators;
                     curNode->conditions = conditions;
                 }
+                else if(containsFor(lines[curIndex-1])){
+                    string tem = getConditionInsideFor(lines[curIndex-1]);
+                    vector<string> conditions = detachIfMultipleCondition(tem);
+                    vector<char> operators = getOperators(tem);
+                    curNode->operators = operators;
+                    curNode->conditions = conditions;
+                    cyclomaticComplexity++;
+                }
                 buildCFG(curNode, true);
             }
             else
@@ -351,6 +384,7 @@ Node* buildCFG(Node *root, bool isLoop)
                 curNode->conditions = conditions;
                 cyclomaticComplexity++;
             }
+
             parent->children.push_back(curNode);
             curIndex++;
             branches.push_back(buildCFG(curNode, false));
@@ -457,15 +491,24 @@ void traverse(Node* current, int level)
     }
     cout<< endl;
     */
-    cout<< current->conditions.size()<<endl;
+   /* cout<< current->conditions.size()<<endl;
     for(int i=0;i<current->conditions.size();i++){
         cout<< current->conditions[i] << " ";
         if(i< (current->conditions.size()-1)){
-            cout<< "siam";
+            //cout<< "siam";
             cout<< current->operators[i] << " ";
         }
     }
-    cout << endl;
+    cout << endl << "op: " ;
+    cout<< current->opConditions.size()<<endl;
+    for(int i=0;i<current->opConditions.size();i++){
+        cout<< current->opConditions[i] << " ";
+        if(i< (current->opConditions.size()-1)){
+            //cout<< "siam";
+            cout<< current->opOperators[i] << " ";
+        }
+    }
+    cout << endl;*/
     for(int i=0;i< current->children.size(); i++){
         if(!visited[current->children[i]->lineNo]){
             //cout<< "child: " << current->children[i]->lineNo+1 << endl;
@@ -494,6 +537,7 @@ void showGraph()
     s[23] = '0' + cyclomaticComplexity ;
     settextstyle(8, 0, 4);
     outtextxy(700, 100, s);
+    reset();
     traverse(root, 0);
     reset();
     assignCoordinates(root, 0);
@@ -550,7 +594,7 @@ window* getWindow(char op, int value, string var){
     return toRet;
 }
 
-void prepareVariableWindows(Node* current, int level)
+void prepareVariableWindows(Node* current, int level, bool hide)
 {
     //cout<< "c" <<endl;
     visited[current->lineNo] = true;
@@ -575,6 +619,7 @@ void prepareVariableWindows(Node* current, int level)
         //cout << "dhuksi" <<endl;
         for(int i=0; i< leftCount+1 && i<conditions.size(); i++){
             //cout<< conditions[i] <<endl;
+            //cout<< 1 << " " << conditions[i] <<endl;
             string var = extractVar(conditions[i]);
             int value = extractValue(conditions[i]);
             char op = extractOP(conditions[i]);
@@ -597,6 +642,7 @@ void prepareVariableWindows(Node* current, int level)
     }
     else{
         for(int j=opCount, i=0; i< rightCount + 1 ; i++, j--){ //recheck
+            //cout<< 2 << " " << conditions[j] <<endl;
             string var = extractVar(conditions[j]);
             int value = extractValue(conditions[j]);
             char op = extractOP(conditions[j]);
@@ -630,12 +676,145 @@ void prepareVariableWindows(Node* current, int level)
     //     cout<< a->lineNo+1 << " ";
     // }
     // cout<< endl;
+    vector<string> opConditions = current->opConditions;
+    vector<char> opOperators = current->opOperators;
+    opCount = opOperators.size();
+    leftCount=0, rightCount=0;
+    if(opCount==0) {
+        leftCount = 1;
+        rightCount = 2;
+    }
+    for(i=0;i<opCount; i++){
+        if(opOperators[i] == '|') break;
+        leftCount++;
+    }
+    for(j=opCount-1; j>=0;j--){
+        if(opOperators[j] == '|') break;
+        rightCount++;
+    }
+    //cout<< current->lineNo+1 << " " << leftCount << " " << rightCount << " " << operators.size() << endl;
+    if(leftCount <= rightCount){
+        //cout << "dhuksi" <<endl;
+        for(int i=0; i< leftCount+1 && i<opConditions.size(); i++){
+            //cout<< conditions[i] <<endl;
+            //cout<< 1 << " " << conditions[i] <<endl;
+            string var = extractVar(opConditions[i]);
+            int value = extractValue(opConditions[i]);
+            char op = extractOP(opConditions[i]);
+            //cout<< "1  " << var << " " << value << " " << op << endl;
+            window *wn = getWindow(op, value, var);
+            if(varExist(var, vars)){
+                for(int k=0; k<vars.size(); k++){
+                    if(var == vars[k].var){
+                        vars[k].windows.push_back(*wn);
+                    }
+                }
+            }else{
+                varRanges *varR = new varRanges(var);
+                varR->windows.push_back(*wn);
+                //cout<< "pushed" <<endl;
+                vars.push_back(*varR);
+            }
+        // window *wn = getWindow()
+        }
+    }
+    else{
+        for(int j=opCount, i=0; i< rightCount + 1 ; i++, j--){ //recheck
+            //cout<< 2 << " " << conditions[j] <<endl;
+            string var = extractVar(opConditions[j]);
+            int value = extractValue(opConditions[j]);
+            char op = extractOP(conditions[j]);
+            //cout<< "2  " << var << " " << value << " " << op << endl;
+            window *wn = getWindow(op, value, var);
+            if(varExist(var, vars)){
+                for(int k=0; k<vars.size(); k++){
+                    if(var == vars[k].var){
+                        vars[k].windows.push_back(*wn);
+                    }
+                }
+            }else{
+                varRanges *varR = new varRanges(var);
+                varR->windows.push_back(*wn);
+                //cout<< "pushed" <<endl;
+                vars.push_back(*varR);
+            }
+        // window *wn = getWindow()
+        }
+    }
+
+    if(hide){
+        vector<string> opConditions = current->hiddenConditions;
+        vector<char> opOperators = current->hiddenOperators;
+        opCount = opOperators.size();
+        leftCount=0, rightCount=0;
+        if(opCount==0) {
+            leftCount = 1;
+            rightCount = 2;
+        }
+        for(i=0;i<opCount; i++){
+            if(opOperators[i] == '|') break;
+            leftCount++;
+        }
+        for(j=opCount-1; j>=0;j--){
+            if(opOperators[j] == '|') break;
+            rightCount++;
+        }
+        //cout<< current->lineNo+1 << " " << leftCount << " " << rightCount << " " << operators.size() << endl;
+        if(leftCount <= rightCount){
+            //cout << "dhuksi" <<endl;
+            for(int i=0; i< leftCount+1 && i<opConditions.size(); i++){
+                //cout<< conditions[i] <<endl;
+                //cout<< 1 << " " << conditions[i] <<endl;
+                string var = extractVar(opConditions[i]);
+                int value = extractValue(opConditions[i]);
+                char op = extractOP(opConditions[i]);
+                //cout<< "1  " << var << " " << value << " " << op << endl;
+                window *wn = getWindow(op, value, var);
+                if(varExist(var, vars)){
+                    for(int k=0; k<vars.size(); k++){
+                        if(var == vars[k].var){
+                            vars[k].windows.push_back(*wn);
+                        }
+                    }
+                }else{
+                    varRanges *varR = new varRanges(var);
+                    varR->windows.push_back(*wn);
+                    //cout<< "pushed" <<endl;
+                    vars.push_back(*varR);
+                }
+            // window *wn = getWindow()
+            }
+        }
+        else{
+            for(int j=opCount, i=0; i< rightCount + 1 ; i++, j--){ //recheck
+                //cout<< 2 << " " << conditions[j] <<endl;
+                string var = extractVar(opConditions[j]);
+                int value = extractValue(opConditions[j]);
+                char op = extractOP(conditions[j]);
+                //cout<< "2  " << var << " " << value << " " << op << endl;
+                window *wn = getWindow(op, value, var);
+                if(varExist(var, vars)){
+                    for(int k=0; k<vars.size(); k++){
+                        if(var == vars[k].var){
+                            vars[k].windows.push_back(*wn);
+                        }
+                    }
+                }else{
+                    varRanges *varR = new varRanges(var);
+                    varR->windows.push_back(*wn);
+                    //cout<< "pushed" <<endl;
+                    vars.push_back(*varR);
+                }
+            // window *wn = getWindow()
+            }
+        }
+    }
 
     for(int i=0;i< current->children.size(); i++){
         //cout<< visited[current->children[i]->lineNo] <<endl;
         if(!visited[current->children[i]->lineNo]){
             //cout << "h" <<endl;
-            prepareVariableWindows(current->children[i], level+1);
+            prepareVariableWindows(current->children[i], level+1, hide);
         }
     }
 }
@@ -653,24 +832,35 @@ void compressWindow()
     for(int i = 0; i< vars.size(); i++){
         sort(vars[i].windows.begin(), vars[i].windows.end(), compareInterval);
         for(int j=0; j< vars[i].windows.size(); j++){
-            for(int k=0; k< vars[i].windows.size(); k++){
+            for(int k=j+1; k< vars[i].windows.size(); k++){
                 if(j==k) continue;
                 if(vars[i].windows[j].minn <= vars[i].windows[k].minn && vars[i].windows[j].maxx>= vars[i].windows[k].maxx){
                     //that means windows[j] can be completely replaced by windows[k]
                     vars[i].windows.erase(vars[i].windows.begin()+j);
                 }
+                else if(vars[i].windows[j].maxx >= vars[i].windows[k].minn){
+                    //cout<< "compress er else if " << endl;
+                    vars[i].windows[j].minn = vars[i].windows[k].minn;
+                    vars[i].windows[j].maxx = min(vars[i].windows[j].maxx, vars[i].windows[k].maxx);
+                    vars[i].windows.erase(vars[i].windows.begin()+k);
+                }
+                /*else if(vars[i].windows[j].minn <= vars[i].windows[k].minn && vars[i].windows[j].maxx <= vars[i].windows[k].minn){
+                    cout<< "compress er else if " << endl;
+                    vars[i].windows[j].minn = vars[i].windows[j].maxx;
+                    vars[i].windows.erase(vars[i].windows.begin()+k);
+                }*/
             }
             //cout<< vars[i].windows[j].minn << " " << vars[i].windows[j].maxx << endl;
         }
     }
-    cout<< "after: ";
+   /* cout<< "after: ";
     for(int i = 0; i< vars.size(); i++){
         cout << "var: " << vars[i].var << endl;
         cout << "windows: ";
         for(int j=0; j< vars[i].windows.size(); j++){
             cout<< vars[i].windows[j].minn << " " << vars[i].windows[j].maxx << endl;
         }
-    }
+    }*/
 }
 
 void findElseCondition(Node* root)
@@ -681,20 +871,64 @@ void findElseCondition(Node* root)
     visited[root->lineNo] = true;
     while(!q.empty()){
         Node* cur = q.front();
+        //cout<< "cur: " << cur->lineNo+1 <<endl;
         q.pop();
+
         visited[cur->lineNo] = true;
         if(cur->children.size()>1){
-            bool elsePresent = false;
+            bool elsePresent = false, ifPresent = false;
             vector<string> conditions;
             vector<char> operators;
+            Node* prev;
             for(int i=0; i<cur->children.size();i++){
-                if(containsElseIf(lines[cur->children[i]->lineNo])){
+                //cout<< "child: " << cur->children[i]->lineNo +1 << endl;
+                if(containsIf(lines[cur->children[i]->lineNo])){
                     last =  lines[cur->children[i]->lineNo];
-                    cout<< last<< endl;
+                    //cout<< "last: "<< last<< endl;
                     conditions = cur->children[i]->conditions;
                     operators = cur->children[i]->operators;
+                    ifPresent = true;
+                }
+                else if(containsElseIf(lines[cur->children[i]->lineNo])){
+                    //cout<< "else if" <<endl;
+                    string tem;
+                    if(containsIf(lines[prev->lineNo])){
+                        tem = getItemsInsideIf(last);
+                    }
+                    else if(containsElseIf(lines[prev->lineNo])){
+                        tem = getItemsInsideElseIf(last);
+                    }
+
+                   // cout<< "tem in else: " <<tem << endl;
+                    vector<string> conditions = detachIfMultipleCondition(tem);
+                    //cout<< "conditions: ";
+                    /*for(int j=0;j<conditions.size();j++){
+                        cout<< conditions[j]<< endl;
+                    }*/
+                    vector<char> operators = getOperators(tem);
+                    for(int j=0;j< operators.size();j++){
+                        operators[j] = alter(operators[j]);
+                    }
+                    for(int k=0;k<conditions.size();k++){
+                       // cout<< "c: " << conditions[k] <<endl;
+                        for(int j=0;j<conditions[k].length();j++){
+                            if(conditions[k][j] == '>' || conditions[k][j] == '<' || conditions[k][j] == '=' || conditions[k][j] == '!' || conditions[k][j] == '&' || conditions[k][j] == '|'){
+                                conditions[k][j] = alter(conditions[k][j]);
+                            }
+                        }
+                    }
+                    //cout<< "1" << endl;
+                    for(int j=0;j<conditions.size();j++){
+                        cur->children[i]->opConditions.push_back(conditions[j]);
+                    }
+                    for(int j=0;j<operators.size();j++){
+                        cur->children[i]->opOperators.push_back(operators[j]);
+                    }
+                    last =  lines[cur->children[i]->lineNo];
+                    //cout<< "2" << endl;
                 }
                 else if(containsElse(lines[cur->children[i]->lineNo])){
+                    //cout<< "else" <<endl;
                     string tem = getItemsInsideElseIf(last);
                     vector<string> conditions = detachIfMultipleCondition(tem);
                     vector<char> operators = getOperators(tem);
@@ -702,8 +936,8 @@ void findElseCondition(Node* root)
                         operators[j] = alter(operators[j]);
                     }
                     for(int k=0;k<conditions.size();k++){
-                        for(int j=0;j<conditions[i].length();j++){
-                            if(conditions[k][j] == '>' || conditions[k][j] == '<' || conditions[i][j] == '=' || conditions[i][j] == '!' || conditions[i][j] == '&' || conditions[i][j] == '|'){
+                        for(int j=0;j<conditions[k].length();j++){
+                            if(conditions[k][j] == '>' || conditions[k][j] == '<' || conditions[k][j] == '=' || conditions[k][j] == '!' || conditions[k][j] == '&' || conditions[k][j] == '|'){
                                 conditions[k][j] = alter(conditions[k][j]);
                             }
                         }
@@ -711,7 +945,32 @@ void findElseCondition(Node* root)
 
                     cur->children[i]->operators = operators;
                     cur->children[i]->conditions = conditions;
+                    //cout<< "yes" <<endl;
+                    elsePresent = true;
                 }
+                prev = cur->children[i];
+                //cout<< "prev: " << prev->lineNo+1 <<endl;
+            }
+            if(ifPresent&&!elsePresent){
+                //cout<< "eikhane" << endl;
+                string tem = getItemsInsideElseIf(last);
+                vector<string> conditions = detachIfMultipleCondition(tem);
+                vector<char> operators = getOperators(tem);
+                //cout<< "eikhane2" << endl;
+                for(int j=0;j< operators.size();j++){
+                    operators[j] = alter(operators[j]);
+                }
+                for(int k=0;k<conditions.size();k++){
+                    for(int j=0;j<conditions[k].length();j++){
+                        if(conditions[k][j] == '>' || conditions[k][j] == '<' || conditions[k][j] == '=' || conditions[k][j] == '!' || conditions[k][j] == '&' || conditions[k][j] == '|'){
+                            conditions[k][j] = alter(conditions[k][j]);
+                        }
+                    }
+                }
+                //cout<< "eikhane3" << endl;
+                cur->children[cur->children.size()-1]->hiddenOperators = operators;
+                cur->children[cur->children.size()-1]->hiddenConditions = conditions;
+                //cout<< "eikhane4" << endl;
             }
         }
         for(int i=0; i<cur->children.size();i++){
@@ -723,34 +982,15 @@ void findElseCondition(Node* root)
 
 void initStatementCoverage()
 {
-    // while(!containsMain(lines[curIndex])){
-    //     curIndex++;
-    // }
-    // curIndex++;
-    Node *root = new Node(curIndex);
+    root = new Node(curIndex);
     curIndex++;
     buildCFG(root, false);
-    char s[60] = "Cyclomatic Complexity: ";
-    s[23] = '0' + cyclomaticComplexity ;
-    traverse(root, 0);
     cout<< "cyclomatic complexity: " << cyclomaticComplexity << endl;
     reset();
     findElseCondition(root);
     reset();
-    prepareVariableWindows(root, 0);
-    cout<< "before: ";
-    for(int i = 0; i< vars.size(); i++){
-        cout << "var: " << vars[i].var << endl;
-        cout << "windows: ";
-        for(int j=0; j< vars[i].windows.size(); j++){
-            cout<< vars[i].windows[j].minn << " " << vars[i].windows[j].maxx << endl;
-        }
-    }
-    compressWindow();
-    reset();
-
-    cout<< "after: "<< endl;
     traverse(root, 0);
+    reset();
 }
 
 int getValueWithinWindow(window w)
@@ -785,6 +1025,85 @@ void generateTestCases()
 }
 
 
+void conditionHelper(Node *cur)
+{
+    visited[cur->lineNo] = true;
+    vector<string> conditions = cur->conditions;
+    vector<char> operators = cur->operators;
+    //cout<< current->lineNo+1 << " " << leftCount << " " << rightCount << " " << operators.size() << endl;
+
+        //cout << "dhuksi" <<endl;
+    for(int i=0; i<conditions.size(); i++){
+
+        string var = extractVar(conditions[i]);
+        int value = extractValue(conditions[i]);
+        char op = extractOP(conditions[i]);
+        window *wn = getWindow(op, value, var);
+        if(varExist(var, vars)){
+            for(int k=0; k<vars.size(); k++){
+                if(var == vars[k].var){
+                    vars[k].windows.push_back(*wn);
+                }
+            }
+        }else{
+            varRanges *varR = new varRanges(var);
+            varR->windows.push_back(*wn);
+            //cout<< "pushed" <<endl;
+            vars.push_back(*varR);
+        }
+    }
+
+    for(int j=0;j< operators.size();j++){
+        operators[j] = alter(operators[j]);
+    }
+    for(int k=0;k<conditions.size();k++){
+        //cout<< "c: " << conditions[k] <<endl;
+        for(int j=0;j<conditions[k].length();j++){
+            if(conditions[k][j] == '>' || conditions[k][j] == '<' || conditions[k][j] == '=' || conditions[k][j] == '!' || conditions[k][j] == '&' || conditions[k][j] == '|'){
+                conditions[k][j] = alter(conditions[k][j]);
+            }
+        }
+    }
+
+    for(int i=0; i<conditions.size(); i++){
+
+        string var = extractVar(conditions[i]);
+        int value = extractValue(conditions[i]);
+        char op = extractOP(conditions[i]);
+        window *wn = getWindow(op, value, var);
+        if(varExist(var, vars)){
+            for(int k=0; k<vars.size(); k++){
+                if(var == vars[k].var){
+                    vars[k].windows.push_back(*wn);
+                }
+            }
+        }else{
+            varRanges *varR = new varRanges(var);
+            varR->windows.push_back(*wn);
+            //cout<< "pushed" <<endl;
+            vars.push_back(*varR);
+        }
+    }
+
+    for(int i=0; i<cur->children.size();i++){
+        if(!visited[cur->children[i]->lineNo])
+            conditionHelper(cur->children[i]);
+    }
+        // window *wn = getWindow()
+
+
+}
+
+void conditionCoverage(Node* current, int level)
+{
+    root = new Node(curIndex);
+    curIndex++;
+    buildCFG(root, false);
+    reset();
+    conditionHelper(root);
+}
+
+
 void menu()
 {
     while(1)
@@ -793,22 +1112,51 @@ void menu()
         curIndex = 0;
         cyclomaticComplexity = 2;
         vars.clear();
+        cout<< "\n\n===================\n\n";
         cout << "1. Statement Coverage\n2. Branch Coverage\n3. Condition Coverage\n4. Visualize CFG\n";
+        cout<< "\n===================\n\n";
         int choice;
         cin>> choice;
+
         cout << "Enter file name: ";
         string filename;
         cin >> filename;
         readFile(filename);
         if(choice == 1){
             initStatementCoverage();
+            prepareVariableWindows(root, 0, false);
+           /* cout<< "before: ";
+            for(int i = 0; i< vars.size(); i++){
+                cout << "var: " << vars[i].var << endl;
+                cout << "windows: ";
+                for(int j=0; j< vars[i].windows.size(); j++){
+                    cout<< vars[i].windows[j].minn << " " << vars[i].windows[j].maxx << endl;
+                }
+            }*/
+            compressWindow();
+            /*cout<< "after: ";
+            for(int i = 0; i< vars.size(); i++){
+                cout << "var: " << vars[i].var << endl;
+                cout << "windows: ";
+                for(int j=0; j< vars[i].windows.size(); j++){
+                    cout<< vars[i].windows[j].minn << " " << vars[i].windows[j].maxx << endl;
+                }
+            }*/
+            reset();
             generateTestCases();
         }
         else if(choice == 2){
-
+            initStatementCoverage();
+            prepareVariableWindows(root, 0, true);
+            compressWindow();
+            reset();
+            generateTestCases();
         }
         else if(choice == 3){
-
+            conditionCoverage(root, 0);
+            compressWindow();
+            reset();
+            generateTestCases();
         }
         else if(choice == 4){
             showGraph();
@@ -819,6 +1167,7 @@ void menu()
 
 int main()
 {
+    cout<< getConditionInsideFor("for(int i=0;i<n;i++)");
     menu();
     /*string in =  getItemsInsideElseIf("else if(a>b && b>c || c<a)");
     vector<string> detached = detachIfMultipleCondition(in);
